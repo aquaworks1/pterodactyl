@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+# Add libraries
+source /usr/local/lib/bash-logger.sh
+
+WARNING "[PTERODACTYL-SFTP-SERVER] -- Ending Service Pterodactyl sftp-server with parameters ${@}"
+
+# Tell runit to shutdown the system:
+[ "$1" = 1 ] && runit stop &

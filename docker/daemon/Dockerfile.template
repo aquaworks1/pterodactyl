@@ -1,0 +1,78 @@
+FROM dsuite/alpine-nodejs:lts
+
+# LABEL maintainer="Hexosse <hexosse@gmail.com>" \
+#     org.opencontainers.image.title="docker-suite dsuite/pterodactyl-daemon image" \
+#     org.opencontainers.image.description="Alpine image with Pterodactyl Daemon for Pterodactyl Panel" \
+#     org.opencontainers.image.authors="Hexosse <hexosse@gmail.com>" \
+#     org.opencontainers.image.vendor="docker-suite" \
+#     org.opencontainers.image.licenses="MIT" \
+#     org.opencontainers.image.url="https://github.com/docker-suite/pterodactyl" \
+#     org.opencontainers.image.source="https://github.com/docker-suite/pterodactyl" \
+#     org.opencontainers.image.documentation="https://github.com/docker-suite/pterodactyl/blob/master/Readme.md" \
+#     org.opencontainers.image.created="{{DOCKER_IMAGE_CREATED}}" \
+#     org.opencontainers.image.revision="{{DOCKER_IMAGE_REVISION}}"
+
+
+# Pterodactyl Daemon version :https://github.com/pterodactyl/saemon/releases
+ENV DAEMON_VERSION={{DAEMON_VERSION}} \
+    SFTP_SERVER_VERSION={{SFTP_SERVER_VERSION}}
+
+# Define working directory
+WORKDIR /srv/daemon
+
+# Install Pterodactyl Daemon : https://daemon.pterodactyl.io/docs/install-daemon
+RUN \
+    # Print executed commands
+    set -x \
+    # Update repository indexes
+    && apk-update \
+    # Add temporary build packages
+    && apk-install --virtual .build-dependencies \
+        tar \
+        unzip \
+        make \
+        gcc \
+        g++ \
+        python \
+    # Add packages
+    && apk-install \
+        curl \
+        coreutils  \
+        openssl \
+        paxctl \
+        gnupg  \
+    # Download Pterodactyl Daemon
+    && curl -Lo "daemon.tar.gz" "https://github.com/Pterodactyl/Daemon/releases/download/v${DAEMON_VERSION}/daemon.tar.gz" \
+    && tar --strip-components=1 -xzvf daemon.tar.gz \
+    && rm "daemon.tar.gz" \
+    # fix an issue with node 10 : https://github.com/pterodactyl/panel/issues/1289
+    && rm -f "package-lock.json" \
+    # Install Pterodactyl Daemon
+    && npm install --production \
+    # Adding pterodactyl user required by the sftp-server
+    && addgroup -S pterodactyl && adduser -S -D -H -G pterodactyl -s /bin/false pterodactyl \
+    # Add sftp-server
+    && curl -sSL "https://github.com/pterodactyl/sftp-server/releases/download/v${SFTP_SERVER_VERSION}/sftp-server" > /srv/daemon/sftp-server \
+    && chmod +x /srv/daemon/sftp-server \
+    # default timezone
+    && set-timezone UTC \
+    # Clear apk's cache
+    && apk-remove .build-dependencies \
+    && apk-cleanup \
+    # Extra cleaning
+    && find /srv/daemon -name ".gitkeep" -type f -delete \
+    && find /srv/daemon -name ".githold" -type f -delete \
+    && find /srv/daemon -name ".gitignore" -type f -delete \
+    && rm -rf /root/.npm/root/.gnupg
+
+# Copy scripts
+COPY /rootfs /
+
+# Expose the port used by the daemon and the sftp server
+EXPOSE 8080 2022
+
+## Entrypoint
+ENTRYPOINT ["/entrypoint.sh"]
+
+## Start runit
+CMD ["start"]

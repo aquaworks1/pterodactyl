@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+# set -e : Exit the script if any statement returns a non-true return value.
+# set -u : Exit the script when using uninitialised variable.
+set -eu
+
+# Add libraries
+source /usr/local/lib/bash-logger.sh
+source /usr/local/lib/persist-env.sh
+
+# Redirect STDERR to STDOUT
+exec 2>&1
+
+# Wait for the core.json file in config folder
+while ! test -s "/srv/daemon/config/core.json"; do
+  NOTICE "Pterodactyl sftp-server is waiting for core.json to exist in config folder"
+  sleep 10
+done
+
+# Move to the working directory before starting the daemon
+cd /srv/daemon
+
+# sftp-server
+if [ $(cat /srv/daemon/config/core.json | jq -r '.sftp.enabled') == "null" ]; then
+    NOTICE "Updating config to enable sftp-server."
+    cat /srv/daemon/config/core.json | jq '.sftp.enabled |= false' > /tmp/core
+    cat /tmp/core > /srv/daemon/config/core.json
+elif [ $(cat /srv/daemon/config/core.json | jq -r '.sftp.enabled') == "false" ]; then
+    NOTICE "Config already set up for golang sftp server"
+else
+    WARNING "You may have purposly set the sftp to true and that will fail."
+fi
+
+# Let's go and start Pterodactyl Daemon
+NOTICE ''
+NOTICE 'Starting Pterodactyl sftp-server ...'
+exec /srv/daemon/sftp-server -port 2022
+
+# This exit code will be sent as the first parameter to the finish script
+exit 1

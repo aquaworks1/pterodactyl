@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# set -e : Exit the script if any statement returns a non-true return value.
+set -e
+
+# Use templater to generate /data/pterodactyl.conf file
+(set -a && source /etc/environment && templater /etc/service.d/pterodactyl/.env/.env.tpl --silent > /data/pterodactyl.conf)
+
+# Comment out mail info if not defined
+[ -z $MAIL_PASSWORD ] && sed -i -e 's/^MAIL_PASSWORD/#&/' /data/pterodactyl.conf || true
+[ -z $MAIL_ENCRYPTION ] && sed -i -e 's/^MAIL_ENCRYPTION/#&/' /data/pterodactyl.conf || true
+[ -z $MAIL_FROM_NAME ] && sed -i -e 's/^MAIL_FROM_NAME/#&/' /data/pterodactyl.conf || true
+
+# Comment out admin user if not defined
+[ -z $ADMIN_USERNAME ] && sed -i -e 's/^ADMIN_USERNAME/#&/' /data/pterodactyl.conf || true
+[ -z $ADMIN_FIRST_NAME ] && sed -i -e 's/^ADMIN_FIRST_NAME/#&/' /data/pterodactyl.conf || true
+[ -z $ADMIN_LAST_NAME ] && sed -i -e 's/^ADMIN_LAST_NAME/#&/' /data/pterodactyl.conf || true
+[ -z $ADMIN_MAIL ] && sed -i -e 's/^ADMIN_MAIL/#&/' /data/pterodactyl.conf || true
+[ -z $ADMIN_PASSWORD ] && sed -i -e 's/^ADMIN_PASSWORD/#&/' /data/pterodactyl.conf || true

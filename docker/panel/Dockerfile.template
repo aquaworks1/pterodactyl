@@ -1,0 +1,69 @@
+FROM dsuite/alpine-php:7.4-nginx-fpm
+
+# LABEL maintainer="Hexosse <hexosse@gmail.com>" \
+#     org.opencontainers.image.title="docker-suite dsuite/pterodactyl-panel image" \
+#     org.opencontainers.image.description="Alpine image with Pterodactyl Panel" \
+#     org.opencontainers.image.authors="Hexosse <hexosse@gmail.com>" \
+#     org.opencontainers.image.vendor="docker-suite" \
+#     org.opencontainers.image.licenses="MIT" \
+#     org.opencontainers.image.url="https://github.com/docker-suite/pterodactyl" \
+#     org.opencontainers.image.source="https://github.com/docker-suite/pterodactyl" \
+#     org.opencontainers.image.documentation="https://github.com/docker-suite/pterodactyl/blob/master/Readme.md" \
+#     org.opencontainers.image.created="{{DOCKER_IMAGE_CREATED}}" \
+#     org.opencontainers.image.revision="{{DOCKER_IMAGE_REVISION}}"
+
+
+# Pterodactyl Panel version :https://github.com/pterodactyl/panel/releases
+ENV PANEL_VERSION={{PANEL_VERSION}}
+
+# Define working directory
+WORKDIR /var/www
+
+# Install Pterodactyl Panel : https://pterodactyl.io/panel/0.7/getting_started.html
+RUN \
+    # Print executed commands
+    set -x \
+    # Update repository indexes
+    && apk-update \
+    # Make sure composer is up to date
+    && composer self-update \
+    # Download Pterodactyl
+    && curl -Lo "panel.tar.gz" "https://github.com/Pterodactyl/Panel/releases/download/v${PANEL_VERSION}/panel.tar.gz" \
+	&& tar --strip-components=1 -xzvf panel.tar.gz -C /var/www/ \
+    && rm panel.tar.gz \
+    # Install pterodactyl
+    && composer install --ansi --no-dev --no-scripts --optimize-autoloader --working-dir=/var/www/ \
+    # Create folders
+    && mkdir -p storage \
+    && mkdir -p storage/app \
+    && mkdir -p storage/app/public \
+    && mkdir -p storage/framework \
+    && mkdir -p storage/framework/cache \
+    && mkdir -p storage/framework/sessions \
+    && mkdir -p storage/framework/views \
+    && mkdir -p storage/logs \
+    && mkdir -p bootstrap/cache \
+    # set owner
+    && chown -R www-data:www-data . \
+    # set correct permissions
+    && chmod -R 777  storage/* bootstrap/cache \
+	# Clear apk's cache
+	&& apk-cleanup \
+    # Remove default php-fpm service
+    && rm -rf /etc/service.d/php-fpm
+
+# Copy scripts
+COPY /rootfs /
+RUN chmod +x /usr/local/bin/artisan
+
+# Add volume to allow persistence
+VOLUME [ "/data" ]
+
+# Expose HTTP and HTTPS ports
+EXPOSE 80 443
+
+## Entrypoint
+ENTRYPOINT ["/entrypoint.sh"]
+
+## Start runit
+CMD ["start"]

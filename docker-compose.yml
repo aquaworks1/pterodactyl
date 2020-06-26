@@ -1,0 +1,145 @@
+#
+# Pterodactyl single daemon by hexosse
+#
+version: '3'
+
+#
+networks:
+  pterodactyl_nw:
+    external:
+      name: pterodactyl_nw
+
+#
+services:
+
+  # MariaDB
+  mariadb:
+    image: dsuite/mariadb:10.5
+    container_name: mariadb
+    hostname: mariadb
+    restart: unless-stopped
+    environment:
+      # https://github.com/docker-suite/alpine-base#-environment-variables
+      - TIMEZONE=UTC
+      # https://github.com/docker-suite/mariadb#-environment-variables
+      - MYSQL_ROOT_PASSWORD=MyRootPassword          # Change data base root password
+      - MYSQL_DATABASE=pterodactyl
+      - MYSQL_USER=pterodactyl
+      - MYSQL_PASSWORD=MyDbPassword
+    volumes:
+      # https://github.com/docker-suite/mariadb/blob/master/Readme.md#-volumes
+      - /srv/pterodactyl/database/config:/mariadb/config
+      - /srv/pterodactyl/database/backup:/mariadb/backup
+      - /srv/pterodactyl/database/data:/mariadb/data
+
+  # Redis (database cache)
+  redis:
+    image: redis:alpine
+    container_name: redis
+    hostname: redis
+    restart: unless-stopped
+
+  # Pterodactyl panel
+  panel:
+    image: dsuite/pterodactyl-panel
+    container_name: pterodactyl-panel
+    hostname: pterodactyl-panel
+    restart: unless-stopped
+    environment:
+      # https://github.com/docker-suite/alpine-base#-environment-variables
+      - TIMEZONE=UTC
+      - DEBUG_LEVEL=DEBUG
+      # https://github.com/docker-suite/alpine-php#-environment-variables
+      - OPCACHE_ENABLE=1
+      - OPCACHE_ENABLE_CLI=1
+      - OPCACHE_INTERNED_STRINGS_BUFFER=8
+      - OPCACHE_MAX_ACCELERATED_FILES=10000
+      - OPCACHE_ENABLE_MEMORY_CONSUMPTION=128
+      - OPCACHE_SAVE_COMMENTS=1
+      - OPCACHE_REVALIDATE_FREQ=1
+      # https://github.com/docker-suite/alpine-nginx#-environment-variables
+      - NGINX_SERVER_NAME=_
+      - NGINX_ROOT=public
+      # https://github.com/docker-suite/pterodactyl#-environment-variables
+      # Database settings
+      - DB_HOST=mariadb
+      - DB_PORT=3306
+      - DB_DATABASE=pterodactyl
+      - DB_USERNAME=pterodactyl
+      - DB_PASSWORD=MyDbPassword
+      # redis connection
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      # Domain settings
+      - APP_URL=http://panel.pterodactyl.loc
+      # Timezone settings
+      - APP_TIMEZONE=UTC
+      # panel admin
+      - ADMIN_USERNAME=admin
+      - ADMIN_FIRST_NAME=admin
+      - ADMIN_LAST_NAME=ADMIN
+      - ADMIN_MAIL=me@pterodactyl.io
+      - ADMIN_PASSWORD=MyAdminP@ssw0rd
+      # Cache settings
+      - CACHE_DRIVER=redis
+      - SESSION_DRIVER=redis
+      - QUEUE_DRIVER=redis
+      # Service egg settings
+      - APP_SERVICE_AUTHOR=unknown@unknown.com   # this is the email that gets put on eggs you create
+      # This can help if panel and daemon are on the same host
+      - DOCKER_HOST_IP=${DOCKER_HOST_IP}
+      - DAEMON_URL=http://daemon.pterodactyl.loc
+    volumes:
+      - /srv/pterodactyl/panel:/data
+    depends_on:
+      - mariadb
+      - redis
+    links:
+      - mariadb
+      - redis
+    ports:
+      - 80:80
+      - 443:443
+
+  # Pterodactyl Daemon
+  daemon:
+    image: dsuite/pterodactyl-daemon
+    container_name: pterodactyl-daemon
+    hostname: pterodactyl-daemon
+    restart: unless-stopped
+    privileged: true
+    environment:
+      - http_proxy=${http_proxy}
+      - https_proxy=${https_proxy}
+      - no_proxy=${no_proxy}
+      # This can help if panel and daemon are on the same host
+      - DOCKER_HOST_IP=${DOCKER_HOST_IP}
+      - PANEL_URL=http://panel.pterodactyl.loc
+    volumes:
+      # DO NOT CHANGE THIS MAPPING UNLESS YOU
+      # EDIT THE DAEMON CONFIG TO MATCH
+      - /srv/daemon/config/:/srv/daemon/config/
+      - /srv/daemon-data/:/srv/daemon-data/
+      #
+      - /tmp/pterodactyl:/tmp/pterodactyl
+      # Docker socket
+      - /var/lib/docker:/var/lib/docker
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - 8080:8080
+      - 2022:2022
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: phpmyadmin
+    hostname: phpmyadmin
+    restart: unless-stopped
+    environment:
+      - PMA_HOST=mariadb
+      - PMA_PORT=3306
+    volumes:
+    - /sessions
+    depends_on:
+      - mariadb
+    ports:
+      - 8081:80
