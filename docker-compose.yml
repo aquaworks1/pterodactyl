@@ -88,7 +88,7 @@ services:
       - APP_SERVICE_AUTHOR=unknown@unknown.com   # this is the email that gets put on eggs you create
       # This can help if panel and daemon are on the same host
       - DOCKER_HOST_IP=${DOCKER_HOST_IP}
-      - DAEMON_URL=http://daemon.pterodactyl.loc
+      - DAEMON_URL=daemon.pterodactyl.loc
     volumes:
       - /srv/pterodactyl/panel:/data
     depends_on:
